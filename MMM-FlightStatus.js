@@ -87,9 +87,8 @@ Module.register("MMM-FlightStatus", {
 		let html = `<div class="flight-label">${route ? `${this.escapeHtml(route)} · ` : ""}${this.escapeHtml(flightLine)}</div>`;
 		html += `<div class="flight-meta"><span class="flight-status flight-status-${flight.status}">${statusLabel}</span></div>`;
 		html += `<div class="flight-times">`;
-		html += `<span class="flight-dep">Dep ${depSched}${depTzLabel ? ` ${depTzLabel}` : ""}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</span>`;
-		html += ` · `;
-		html += `<span class="flight-arr">Arr ${arrSched}${arrTzLabel ? ` ${arrTzLabel}` : ""}${arrActual && arrActual !== arrSched ? ` <small>(${arrActual})</small>` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</span>`;
+		html += `<div class="flight-dep">Dep ${depSched}${depTzLabel ? ` ${depTzLabel}` : ""}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</div>`;
+		html += `<div class="flight-arr">Arr ${arrSched}${arrTzLabel ? ` ${arrTzLabel}` : ""}${arrActual && arrActual !== arrSched ? ` <small>(${arrActual})</small>` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</div>`;
 		html += `</div>`;
 
 		row.innerHTML = html;
