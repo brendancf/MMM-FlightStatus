@@ -83,10 +83,13 @@ function detectFlightsFromEvent(event, calendarName) {
 	const dateStr = eventDate.toISOString().slice(0, 10);
 	const label = summary.trim() || `Flight ${flightNumbers[0]}`;
 
+	const airports = extractAirportCodes(text);
+
 	return flightNumbers.map((flightIata) => ({
 		flightIata,
 		date: dateStr,
 		label,
+		airports,
 		calendarName
 	}));
 }

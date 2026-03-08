@@ -70,8 +70,15 @@ Module.register("MMM-FlightStatus", {
 		const depDelay = dep.delay ? parseInt(dep.delay, 10) : null;
 		const arrDelay = arr.delay ? parseInt(arr.delay, 10) : null;
 
-		let html = `<div class="flight-label">${this.escapeHtml(flight.label)}</div>`;
-		html += `<div class="flight-meta">${flight.flightIata} · <span class="flight-status flight-status-${flight.status}">${statusLabel}</span></div>`;
+		// Build route line: airport codes from API (preferred) or calendar, plus airline and flight #
+		const depCode = flight.depIata || (flight.airports && flight.airports[0]) || "";
+		const arrCode = flight.arrIata || (flight.airports && flight.airports[1]) || "";
+		const route = depCode && arrCode ? `${depCode} → ${arrCode}` : depCode || arrCode || "";
+		const airlineStr = flight.airline || "";
+		const flightLine = [airlineStr, flight.flightIata].filter(Boolean).join(" ");
+
+		let html = `<div class="flight-label">${route ? `${this.escapeHtml(route)} · ` : ""}${this.escapeHtml(flightLine)}</div>`;
+		html += `<div class="flight-meta"><span class="flight-status flight-status-${flight.status}">${statusLabel}</span></div>`;
 		html += `<div class="flight-times">`;
 		html += `<span class="flight-dep">Dep ${depSched}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</span>`;
 		html += ` · `;

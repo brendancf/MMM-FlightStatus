@@ -253,8 +253,8 @@ module.exports = NodeHelper.create({
 			return;
 		}
 
-		// AviationStack free tier only supports HTTP
-		const url = `http://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.apiKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}&flight_date=${encodeURIComponent(flight.date)}`;
+		// AviationStack free tier: HTTP only, no flight_date param
+		const url = `http://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.apiKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}`;
 		const http = require("http");
 		http.get(url, (res) => {
 			let body = "";
@@ -263,6 +263,9 @@ module.exports = NodeHelper.create({
 				let status = "unknown";
 				let departure = {};
 				let arrival = {};
+				let airline = "";
+				let depIata = "";
+				let arrIata = "";
 				try {
 					const json = JSON.parse(body);
 					if (json.error) {
@@ -274,7 +277,10 @@ module.exports = NodeHelper.create({
 						status = f.flight_status || "unknown";
 						departure = f.departure || {};
 						arrival = f.arrival || {};
-						Log.info(`${this.name}: ${flight.flightIata} status=${status}`);
+						airline = (f.airline && f.airline.name) || "";
+						depIata = (f.departure && f.departure.iata) || "";
+						arrIata = (f.arrival && f.arrival.iata) || "";
+						Log.info(`${this.name}: ${flight.flightIata} status=${status} ${depIata}->${arrIata} (${airline})`);
 					} else {
 						Log.info(`${this.name}: ${flight.flightIata} — no data returned from API (pagination: ${JSON.stringify(json.pagination || {})})`);
 					}
@@ -286,7 +292,10 @@ module.exports = NodeHelper.create({
 					...flight,
 					status,
 					departure,
-					arrival
+					arrival,
+					airline,
+					depIata,
+					arrIata
 				};
 				this.flightStatusCache[cacheKey] = { data: result, ts: Date.now() };
 				callback(result);
