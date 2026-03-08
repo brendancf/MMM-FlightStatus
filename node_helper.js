@@ -21,6 +21,7 @@ module.exports = NodeHelper.create({
 		this.apiKey = null;
 		this.fetchTimer = null;
 		this.isActive = true;
+		this.lastFlightsPayload = null; // so we can re-send when a client connects
 
 		this.loadConfigAndStart();
 	},
@@ -129,6 +130,16 @@ module.exports = NodeHelper.create({
 		this.scheduleFetch();
 	},
 
+	setSocketIO(io) {
+		NodeHelper.prototype.setSocketIO.call(this, io);
+		const _this = this;
+		io.of(this.name).on("connection", (socket) => {
+			if (_this.lastFlightsPayload) {
+				socket.emit("FLIGHT_STATUS", _this.lastFlightsPayload);
+			}
+		});
+	},
+
 	getTodayRange() {
 		const now = new Date();
 		// Use server local date for "today" (timezone option could be added later with moment-timezone)
@@ -152,7 +163,8 @@ module.exports = NodeHelper.create({
 
 	fetchCalendarsAndFlights() {
 		if (!this.calendarService || this.calendarIds.length === 0) {
-			this.sendSocketNotification("FLIGHT_STATUS", { flights: [] });
+			this.lastFlightsPayload = { flights: [] };
+			this.sendSocketNotification("FLIGHT_STATUS", this.lastFlightsPayload);
 			return;
 		}
 
@@ -199,19 +211,21 @@ module.exports = NodeHelper.create({
 		});
 
 		if (flightsFromCalendar.length === 0) {
-			this.sendSocketNotification("FLIGHT_STATUS", { flights: [] });
+			this.lastFlightsPayload = { flights: [] };
+			this.sendSocketNotification("FLIGHT_STATUS", this.lastFlightsPayload);
 			return;
 		}
 
 		if (!this.apiKey) {
-			this.sendSocketNotification("FLIGHT_STATUS", {
+			this.lastFlightsPayload = {
 				flights: flightsFromCalendar.map((f) => ({
 					...f,
 					status: "unknown",
 					departure: {},
 					arrival: {}
 				}))
-			});
+			};
+			this.sendSocketNotification("FLIGHT_STATUS", this.lastFlightsPayload);
 			return;
 		}
 
@@ -222,7 +236,9 @@ module.exports = NodeHelper.create({
 				results[idx] = flightWithStatus;
 				pending--;
 				if (pending === 0) {
-					this.sendSocketNotification("FLIGHT_STATUS", { flights: results });
+					this.lastFlightsPayload = { flights: results };
+					Log.info(`${this.name}: Sending ${results.length} flight(s) to display`);
+					this.sendSocketNotification("FLIGHT_STATUS", this.lastFlightsPayload);
 				}
 			});
 		});
