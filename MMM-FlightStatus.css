@@ -2,7 +2,12 @@
 	padding: 0;
 }
 
-.mmm-flightstatus .module-header {
+.mmm-flightstatus .flight-status-header {
+	font-size: 17px;
+	font-weight: bold;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	color: #fff;
 	margin-bottom: 0.25em;
 }
 
