@@ -272,15 +272,16 @@ module.exports = NodeHelper.create({
 						Log.warn(`${this.name}: AviationStack API error for ${flight.flightIata}:`, JSON.stringify(json.error));
 					}
 					const data = json.data;
-					if (data && data[0]) {
-						const f = data[0];
+					// Pick the result matching our calendar date, or fall back to first
+					const f = (data && data.find((d) => d.flight_date === flight.date)) || (data && data[0]);
+					if (f) {
 						status = f.flight_status || "unknown";
 						departure = f.departure || {};
 						arrival = f.arrival || {};
 						airline = (f.airline && f.airline.name) || "";
 						depIata = (f.departure && f.departure.iata) || "";
 						arrIata = (f.arrival && f.arrival.iata) || "";
-						Log.info(`${this.name}: ${flight.flightIata} status=${status} ${depIata}->${arrIata} (${airline})`);
+						Log.info(`${this.name}: ${flight.flightIata} date=${f.flight_date} status=${status} ${depIata}->${arrIata} (${airline})`);
 					} else {
 						Log.info(`${this.name}: ${flight.flightIata} — no data returned from API (pagination: ${JSON.stringify(json.pagination || {})})`);
 					}

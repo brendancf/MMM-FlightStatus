@@ -66,10 +66,12 @@ Module.register("MMM-FlightStatus", {
 		const statusLabel = this.statusLabel(flight.status);
 		const dep = flight.departure || {};
 		const arr = flight.arrival || {};
-		const depSched = dep.scheduled ? this.formatTime(dep.scheduled) : "—";
-		const depActual = dep.actual ? this.formatTime(dep.actual) : null;
-		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled) : "—";
-		const arrActual = arr.actual ? this.formatTime(arr.actual) : null;
+		const depTz = dep.timezone || null;
+		const arrTz = arr.timezone || null;
+		const depSched = dep.scheduled ? this.formatTime(dep.scheduled, depTz) : "—";
+		const depActual = dep.actual ? this.formatTime(dep.actual, depTz) : null;
+		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled, arrTz) : "—";
+		const arrActual = arr.actual ? this.formatTime(arr.actual, arrTz) : null;
 		const depGate = dep.gate || "";
 		const arrGate = arr.gate || "";
 		const depDelay = dep.delay ? parseInt(dep.delay, 10) : null;
@@ -107,21 +109,20 @@ Module.register("MMM-FlightStatus", {
 		return labels[status] || status || "—";
 	},
 
-	formatTime(isoStr) {
+	formatTime(isoStr, timezone) {
 		if (!isoStr) return "—";
 		const date = new Date(isoStr);
 		if (isNaN(date.getTime())) return isoStr;
 		const use24 = this.config.timeFormat === 24;
-		if (use24) {
-			const h = date.getHours();
-			const m = date.getMinutes();
-			return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+		const opts = {
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: !use24
+		};
+		if (timezone) {
+			opts.timeZone = timezone;
 		}
-		let h = date.getHours();
-		const ampm = h >= 12 ? "PM" : "AM";
-		h = h % 12 || 12;
-		const m = date.getMinutes();
-		return `${h}:${String(m).padStart(2, "0")} ${ampm}`;
+		return date.toLocaleTimeString("en-US", opts);
 	},
 
 	escapeHtml(text) {
