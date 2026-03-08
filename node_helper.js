@@ -52,9 +52,9 @@ module.exports = NodeHelper.create({
 		try {
 			const keysPath = path.join(this.rootPath, "config", "keys.js");
 			const keys = require(keysPath);
-			this.apiKey = keys.AVIATIONSTACK_KEY || this.config.flightStatusApiKey || "";
+			this.apiKey = keys.FLIGHTAWARE_KEY || this.config.flightStatusApiKey || "";
 			if (!this.apiKey) {
-				Log.warn(`${this.name}: No AviationStack API key. Copy config/keys.sample.js to config/keys.js and add AVIATIONSTACK_KEY.`);
+				Log.warn(`${this.name}: No FlightAware API key. Add FLIGHTAWARE_KEY to config/keys.js.`);
 			}
 		} catch (err) {
 			this.apiKey = this.config.flightStatusApiKey || "";
@@ -253,10 +253,12 @@ module.exports = NodeHelper.create({
 			return;
 		}
 
-		// AviationStack free tier: HTTP only, no flight_date param
-		const url = `http://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.apiKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}`;
-		const http = require("http");
-		http.get(url, (res) => {
+		const https = require("https");
+		const url = `https://aeroapi.flightaware.com/aeroapi/flights/${encodeURIComponent(flight.flightIata)}`;
+		const options = {
+			headers: { "x-apikey": this.apiKey }
+		};
+		https.get(url, options, (res) => {
 			let body = "";
 			res.on("data", (chunk) => (body += chunk));
 			res.on("end", () => {
@@ -268,25 +270,49 @@ module.exports = NodeHelper.create({
 				let arrIata = "";
 				try {
 					const json = JSON.parse(body);
-					if (json.error) {
-						Log.warn(`${this.name}: AviationStack API error for ${flight.flightIata}:`, JSON.stringify(json.error));
+					if (json.title && json.status >= 400) {
+						Log.warn(`${this.name}: FlightAware API error for ${flight.flightIata}:`, json.title, json.detail || "");
 					}
-					const data = json.data;
-					// Pick the result matching our calendar date, or fall back to first
-					const f = (data && data.find((d) => d.flight_date === flight.date)) || (data && data[0]);
+					const flights = json.flights || [];
+					// Match by calendar date (scheduled_out starts with the date in UTC — compare origin local date)
+					const f = flights.find((fl) => {
+						if (!fl.scheduled_out) return false;
+						const depDate = this.utcToLocalDate(fl.scheduled_out, fl.origin && fl.origin.timezone);
+						return depDate === flight.date;
+					}) || flights[0];
 					if (f) {
-						status = f.flight_status || "unknown";
-						departure = f.departure || {};
-						arrival = f.arrival || {};
-						airline = (f.airline && f.airline.name) || "";
-						depIata = (f.departure && f.departure.iata) || "";
-						arrIata = (f.arrival && f.arrival.iata) || "";
-						Log.info(`${this.name}: ${flight.flightIata} date=${f.flight_date} status=${status} ${depIata}->${arrIata} (${airline})`);
+						status = (f.status || "unknown").toLowerCase();
+						const originTz = (f.origin && f.origin.timezone) || "";
+						const destTz = (f.destination && f.destination.timezone) || "";
+						depIata = (f.origin && f.origin.code_iata) || "";
+						arrIata = (f.destination && f.destination.code_iata) || "";
+						airline = (f.operator_iata || "") + (f.flight_number ? " " + f.flight_number : "");
+						const depDelay = f.departure_delay ? Math.round(f.departure_delay / 60) : null;
+						const arrDelay = f.arrival_delay ? Math.round(f.arrival_delay / 60) : null;
+						departure = {
+							scheduled: f.scheduled_out,
+							estimated: f.estimated_out,
+							actual: f.actual_out,
+							gate: f.gate_origin || "",
+							terminal: f.terminal_origin || "",
+							timezone: originTz,
+							delay: depDelay && depDelay > 0 ? depDelay : null
+						};
+						arrival = {
+							scheduled: f.scheduled_in,
+							estimated: f.estimated_in,
+							actual: f.actual_in,
+							gate: f.gate_destination || "",
+							terminal: f.terminal_destination || "",
+							timezone: destTz,
+							delay: arrDelay && arrDelay > 0 ? arrDelay : null
+						};
+						Log.info(`${this.name}: ${flight.flightIata} status="${f.status}" ${depIata}->${arrIata} dep=${f.scheduled_out} arr=${f.scheduled_in}`);
 					} else {
-						Log.info(`${this.name}: ${flight.flightIata} — no data returned from API (pagination: ${JSON.stringify(json.pagination || {})})`);
+						Log.info(`${this.name}: ${flight.flightIata} — no matching flight found in FlightAware response`);
 					}
 				} catch (e) {
-					Log.warn(`${this.name}: AviationStack parse error for ${flight.flightIata}:`, e.message);
+					Log.warn(`${this.name}: FlightAware parse error for ${flight.flightIata}:`, e.message);
 					Log.debug(`${this.name}: Response body: ${body.substring(0, 500)}`);
 				}
 				const result = {
@@ -294,7 +320,7 @@ module.exports = NodeHelper.create({
 					status,
 					departure,
 					arrival,
-					airline,
+					airline: "",
 					depIata,
 					arrIata
 				};
@@ -302,7 +328,7 @@ module.exports = NodeHelper.create({
 				callback(result);
 			});
 		}).on("error", (err) => {
-			Log.warn(`${this.name}: AviationStack request error:`, err.message);
+			Log.warn(`${this.name}: FlightAware request error:`, err.message);
 			callback({
 				...flight,
 				status: "unknown",
@@ -310,5 +336,18 @@ module.exports = NodeHelper.create({
 				arrival: {}
 			});
 		});
+	},
+
+	utcToLocalDate(utcStr, timezone) {
+		if (!utcStr) return "";
+		try {
+			const date = new Date(utcStr);
+			if (timezone) {
+				return date.toLocaleDateString("en-CA", { timeZone: timezone });
+			}
+			return date.toISOString().slice(0, 10);
+		} catch (e) {
+			return utcStr.slice(0, 10);
+		}
 	}
 });

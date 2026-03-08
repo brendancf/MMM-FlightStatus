@@ -66,12 +66,21 @@ Module.register("MMM-FlightStatus", {
 		const statusLabel = this.statusLabel(flight.status);
 		const dep = flight.departure || {};
 		const arr = flight.arrival || {};
-		const depTzLabel = this.tzAbbrev(dep.timezone);
-		const arrTzLabel = this.tzAbbrev(arr.timezone);
-		const depSched = dep.scheduled ? this.formatTime(dep.scheduled) : "—";
-		const depActual = dep.actual ? this.formatTime(dep.actual) : null;
-		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled) : "—";
-		const arrActual = arr.actual ? this.formatTime(arr.actual) : null;
+		const depTz = dep.timezone || null;
+		const arrTz = arr.timezone || null;
+		const depTzLabel = this.tzAbbrev(depTz);
+		const arrTzLabel = this.tzAbbrev(arrTz);
+		const depSched = dep.scheduled ? this.formatTime(dep.scheduled, depTz) : "—";
+		const depEst = dep.estimated ? this.formatTime(dep.estimated, depTz) : null;
+		const depActual = dep.actual ? this.formatTime(dep.actual, depTz) : null;
+		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled, arrTz) : "—";
+		const arrEst = arr.estimated ? this.formatTime(arr.estimated, arrTz) : null;
+		const arrActual = arr.actual ? this.formatTime(arr.actual, arrTz) : null;
+		// Show actual > estimated > scheduled
+		const depDisplay = depActual || depEst || depSched;
+		const arrDisplay = arrActual || arrEst || arrSched;
+		const depChanged = depDisplay !== depSched;
+		const arrChanged = arrDisplay !== arrSched;
 		const depGate = dep.gate || "";
 		const arrGate = arr.gate || "";
 		const depDelay = dep.delay ? parseInt(dep.delay, 10) : null;
@@ -85,10 +94,10 @@ Module.register("MMM-FlightStatus", {
 		const flightLine = [airlineStr, flight.flightIata].filter(Boolean).join(" ");
 
 		let html = `<div class="flight-label">${route ? `${this.escapeHtml(route)} · ` : ""}${this.escapeHtml(flightLine)}</div>`;
-		html += `<div class="flight-meta"><span class="flight-status flight-status-${flight.status}">${statusLabel}</span></div>`;
+		html += `<div class="flight-meta"><span class="flight-status flight-status-${this.statusClass(flight.status)}">${statusLabel}</span></div>`;
 		html += `<div class="flight-times">`;
-		html += `<div class="flight-dep">Dep ${depSched}${depTzLabel ? ` ${depTzLabel}` : ""}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</div>`;
-		html += `<div class="flight-arr">Arr ${arrSched}${arrTzLabel ? ` ${arrTzLabel}` : ""}${arrActual && arrActual !== arrSched ? ` <small>(${arrActual})</small>` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</div>`;
+		html += `<div class="flight-dep">Dep ${depChanged ? `<span class="flight-time-old">${depSched}</span> ${depDisplay}` : depSched}${depTzLabel ? ` ${depTzLabel}` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</div>`;
+		html += `<div class="flight-arr">Arr ${arrChanged ? `<span class="flight-time-old">${arrSched}</span> ${arrDisplay}` : arrSched}${arrTzLabel ? ` ${arrTzLabel}` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</div>`;
 		html += `</div>`;
 
 		row.innerHTML = html;
@@ -96,16 +105,21 @@ Module.register("MMM-FlightStatus", {
 	},
 
 	statusLabel(status) {
-		const labels = {
-			scheduled: "Scheduled",
-			active: "In flight",
-			landed: "Landed",
-			cancelled: "Cancelled",
-			incident: "Incident",
-			diverted: "Diverted",
-			unknown: "—"
-		};
-		return labels[status] || status || "—";
+		if (!status || status === "unknown") return "—";
+		// Capitalize first letter of each word (FlightAware returns e.g. "scheduled", "delayed")
+		return status.replace(/\b\w/g, (c) => c.toUpperCase());
+	},
+
+	statusClass(status) {
+		if (!status) return "";
+		const s = status.toLowerCase();
+		if (s.includes("delay")) return "delayed";
+		if (s.includes("cancel")) return "cancelled";
+		if (s.includes("divert")) return "diverted";
+		if (s.includes("en route") || s.includes("in air")) return "active";
+		if (s.includes("arrived") || s.includes("landed")) return "landed";
+		if (s.includes("scheduled")) return "scheduled";
+		return s;
 	},
 
 	tzAbbrev(timezone) {
@@ -121,19 +135,20 @@ Module.register("MMM-FlightStatus", {
 		}
 	},
 
-	formatTime(isoStr) {
+	formatTime(isoStr, timezone) {
 		if (!isoStr) return "—";
-		// AviationStack returns local airport times mislabeled as UTC (+00:00).
-		// Strip the offset so we parse the time value as-is.
-		const stripped = isoStr.replace(/[+-]\d{2}:\d{2}$/, "").replace(/Z$/, "");
-		const date = new Date(stripped);
+		const date = new Date(isoStr);
 		if (isNaN(date.getTime())) return isoStr;
 		const use24 = this.config.timeFormat === 24;
-		return date.toLocaleTimeString("en-US", {
+		const opts = {
 			hour: "numeric",
 			minute: "2-digit",
 			hour12: !use24
-		});
+		};
+		if (timezone) {
+			opts.timeZone = timezone;
+		}
+		return date.toLocaleTimeString("en-US", opts);
 	},
 
 	escapeHtml(text) {

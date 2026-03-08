@@ -49,6 +49,10 @@
 	color: #b0b0b0;
 }
 
+.mmm-flightstatus .flight-status-delayed {
+	color: #f0ad4e;
+}
+
 .mmm-flightstatus .flight-status-cancelled,
 .mmm-flightstatus .flight-status-incident,
 .mmm-flightstatus .flight-status-diverted {
@@ -67,6 +71,12 @@
 .mmm-flightstatus .flight-status-error {
 	color: #a66;
 	font-size: 0.9em;
+}
+
+.mmm-flightstatus .flight-time-old {
+	text-decoration: line-through;
+	opacity: 0.5;
+	margin-right: 0.3em;
 }
 
 .mmm-flightstatus small {
