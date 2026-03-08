@@ -217,6 +217,7 @@ module.exports = NodeHelper.create({
 		}
 
 		if (!this.apiKey) {
+			Log.warn(`${this.name}: No API key — sending flights without status`);
 			this.lastFlightsPayload = {
 				flights: flightsFromCalendar.map((f) => ({
 					...f,
@@ -264,15 +265,22 @@ module.exports = NodeHelper.create({
 				let arrival = {};
 				try {
 					const json = JSON.parse(body);
+					if (json.error) {
+						Log.warn(`${this.name}: AviationStack API error for ${flight.flightIata}:`, JSON.stringify(json.error));
+					}
 					const data = json.data;
 					if (data && data[0]) {
 						const f = data[0];
 						status = f.flight_status || "unknown";
 						departure = f.departure || {};
 						arrival = f.arrival || {};
+						Log.info(`${this.name}: ${flight.flightIata} status=${status}`);
+					} else {
+						Log.info(`${this.name}: ${flight.flightIata} — no data returned from API (pagination: ${JSON.stringify(json.pagination || {})})`);
 					}
 				} catch (e) {
-					Log.debug(`${this.name}: AviationStack parse error for ${flight.flightIata}:`, e.message);
+					Log.warn(`${this.name}: AviationStack parse error for ${flight.flightIata}:`, e.message);
+					Log.debug(`${this.name}: Response body: ${body.substring(0, 500)}`);
 				}
 				const result = {
 					...flight,

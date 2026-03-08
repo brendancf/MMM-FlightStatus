@@ -44,11 +44,6 @@ Module.register("MMM-FlightStatus", {
 			return wrapper;
 		}
 
-		const header = document.createElement("header");
-		header.className = "module-header";
-		header.textContent = this.config.header;
-		wrapper.appendChild(header);
-
 		const list = document.createElement("div");
 		list.className = "flight-status-list";
 		this.flights.forEach((f) => {
@@ -122,6 +117,13 @@ Module.register("MMM-FlightStatus", {
 		const div = document.createElement("div");
 		div.textContent = text;
 		return div.innerHTML;
+	},
+
+	getHeader() {
+		if (this.flights && this.flights.length > 0) {
+			return this.config.header;
+		}
+		return null;
 	},
 
 	getStyles() {
