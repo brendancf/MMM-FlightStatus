@@ -66,6 +66,8 @@ Module.register("MMM-FlightStatus", {
 		const statusLabel = this.statusLabel(flight.status);
 		const dep = flight.departure || {};
 		const arr = flight.arrival || {};
+		const depTzLabel = this.tzAbbrev(dep.timezone);
+		const arrTzLabel = this.tzAbbrev(arr.timezone);
 		const depSched = dep.scheduled ? this.formatTime(dep.scheduled) : "—";
 		const depActual = dep.actual ? this.formatTime(dep.actual) : null;
 		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled) : "—";
@@ -85,9 +87,9 @@ Module.register("MMM-FlightStatus", {
 		let html = `<div class="flight-label">${route ? `${this.escapeHtml(route)} · ` : ""}${this.escapeHtml(flightLine)}</div>`;
 		html += `<div class="flight-meta"><span class="flight-status flight-status-${flight.status}">${statusLabel}</span></div>`;
 		html += `<div class="flight-times">`;
-		html += `<span class="flight-dep">Dep ${depSched}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</span>`;
+		html += `<span class="flight-dep">Dep ${depSched}${depTzLabel ? ` ${depTzLabel}` : ""}${depActual && depActual !== depSched ? ` <small>(${depActual})</small>` : ""}${depGate ? ` Gate ${depGate}` : ""}${depDelay ? ` <span class="flight-delay">+${depDelay}m</span>` : ""}</span>`;
 		html += ` · `;
-		html += `<span class="flight-arr">Arr ${arrSched}${arrActual && arrActual !== arrSched ? ` <small>(${arrActual})</small>` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</span>`;
+		html += `<span class="flight-arr">Arr ${arrSched}${arrTzLabel ? ` ${arrTzLabel}` : ""}${arrActual && arrActual !== arrSched ? ` <small>(${arrActual})</small>` : ""}${arrGate ? ` Gate ${arrGate}` : ""}${arrDelay ? ` <span class="flight-delay">+${arrDelay}m</span>` : ""}</span>`;
 		html += `</div>`;
 
 		row.innerHTML = html;
@@ -105,6 +107,19 @@ Module.register("MMM-FlightStatus", {
 			unknown: "—"
 		};
 		return labels[status] || status || "—";
+	},
+
+	tzAbbrev(timezone) {
+		if (!timezone) return "";
+		try {
+			// Use Intl to get the short timezone name (e.g. "EDT", "PDT")
+			const fmt = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "short" });
+			const parts = fmt.formatToParts(new Date());
+			const tzPart = parts.find((p) => p.type === "timeZoneName");
+			return tzPart ? tzPart.value : "";
+		} catch (e) {
+			return "";
+		}
 	},
 
 	formatTime(isoStr) {
