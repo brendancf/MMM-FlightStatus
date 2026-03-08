@@ -10,6 +10,25 @@ Shows flight status on your Magic Mirror for flights detected automatically from
 
 ## Setup
 
+### 0. Clone / add as its own repo
+
+This module is a **separate git repo** (like other MMM-* modules). To push and deploy:
+
+1. Create a new repo on GitHub (e.g. `brendancf/MMM-FlightStatus`).
+2. Add the remote and push:
+   ```bash
+   cd modules/MMM-FlightStatus
+   git remote add origin https://github.com/brendancf/MMM-FlightStatus.git
+   git push -u origin master
+   ```
+3. On the Magic Mirror **server** (first time only), clone it into `modules/`:
+   ```bash
+   cd Documents/code/MagicMirror/modules
+   git clone https://github.com/brendancf/MMM-FlightStatus.git
+   cd MMM-FlightStatus && npm install
+   ```
+   After that, your deploy script’s `git pull` in each module will update it.
+
 ### 1. Dependencies
 
 ```bash
