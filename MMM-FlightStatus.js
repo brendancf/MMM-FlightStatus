@@ -66,12 +66,10 @@ Module.register("MMM-FlightStatus", {
 		const statusLabel = this.statusLabel(flight.status);
 		const dep = flight.departure || {};
 		const arr = flight.arrival || {};
-		const depTz = dep.timezone || null;
-		const arrTz = arr.timezone || null;
-		const depSched = dep.scheduled ? this.formatTime(dep.scheduled, depTz) : "—";
-		const depActual = dep.actual ? this.formatTime(dep.actual, depTz) : null;
-		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled, arrTz) : "—";
-		const arrActual = arr.actual ? this.formatTime(arr.actual, arrTz) : null;
+		const depSched = dep.scheduled ? this.formatTime(dep.scheduled) : "—";
+		const depActual = dep.actual ? this.formatTime(dep.actual) : null;
+		const arrSched = arr.scheduled ? this.formatTime(arr.scheduled) : "—";
+		const arrActual = arr.actual ? this.formatTime(arr.actual) : null;
 		const depGate = dep.gate || "";
 		const arrGate = arr.gate || "";
 		const depDelay = dep.delay ? parseInt(dep.delay, 10) : null;
@@ -109,20 +107,19 @@ Module.register("MMM-FlightStatus", {
 		return labels[status] || status || "—";
 	},
 
-	formatTime(isoStr, timezone) {
+	formatTime(isoStr) {
 		if (!isoStr) return "—";
-		const date = new Date(isoStr);
+		// AviationStack returns local airport times mislabeled as UTC (+00:00).
+		// Strip the offset so we parse the time value as-is.
+		const stripped = isoStr.replace(/[+-]\d{2}:\d{2}$/, "").replace(/Z$/, "");
+		const date = new Date(stripped);
 		if (isNaN(date.getTime())) return isoStr;
 		const use24 = this.config.timeFormat === 24;
-		const opts = {
+		return date.toLocaleTimeString("en-US", {
 			hour: "numeric",
 			minute: "2-digit",
 			hour12: !use24
-		};
-		if (timezone) {
-			opts.timeZone = timezone;
-		}
-		return date.toLocaleTimeString("en-US", opts);
+		});
 	},
 
 	escapeHtml(text) {
