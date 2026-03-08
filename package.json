@@ -1,0 +1,13 @@
+{
+  "name": "mmm-flightstatus",
+  "version": "1.0.0",
+  "description": "MagicMirror² module: show flight status for flights detected from Google Calendar events",
+  "main": "MMM-FlightStatus.js",
+  "scripts": {},
+  "keywords": ["magicmirror", "flight", "calendar", "google calendar"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  }
+}

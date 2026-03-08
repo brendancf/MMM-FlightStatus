@@ -1,0 +1,69 @@
+.mmm-flightstatus {
+	padding: 0;
+}
+
+.mmm-flightstatus .module-header {
+	margin-bottom: 0.25em;
+}
+
+.mmm-flightstatus .flight-status-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75em;
+}
+
+.mmm-flightstatus .flight-status-row {
+	font-size: 0.9em;
+	line-height: 1.35;
+}
+
+.mmm-flightstatus .flight-label {
+	font-weight: 600;
+	margin-bottom: 0.15em;
+}
+
+.mmm-flightstatus .flight-meta {
+	color: #aaa;
+	font-size: 0.95em;
+	margin-bottom: 0.2em;
+}
+
+.mmm-flightstatus .flight-status {
+	font-weight: 500;
+}
+
+.mmm-flightstatus .flight-status-scheduled {
+	color: #7cb3e8;
+}
+
+.mmm-flightstatus .flight-status-active {
+	color: #90ee90;
+}
+
+.mmm-flightstatus .flight-status-landed {
+	color: #b0b0b0;
+}
+
+.mmm-flightstatus .flight-status-cancelled,
+.mmm-flightstatus .flight-status-incident,
+.mmm-flightstatus .flight-status-diverted {
+	color: #e88;
+}
+
+.mmm-flightstatus .flight-times {
+	color: #ccc;
+	font-size: 0.9em;
+}
+
+.mmm-flightstatus .flight-delay {
+	color: #f0ad4e;
+}
+
+.mmm-flightstatus .flight-status-error {
+	color: #a66;
+	font-size: 0.9em;
+}
+
+.mmm-flightstatus small {
+	opacity: 0.85;
+}
