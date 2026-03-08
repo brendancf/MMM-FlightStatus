@@ -130,14 +130,14 @@ module.exports = NodeHelper.create({
 		this.scheduleFetch();
 	},
 
-	setSocketIO(io) {
-		NodeHelper.prototype.setSocketIO.call(this, io);
-		const _this = this;
-		io.of(this.name).on("connection", (socket) => {
-			if (_this.lastFlightsPayload) {
-				socket.emit("FLIGHT_STATUS", _this.lastFlightsPayload);
+	socketNotificationReceived(notification, payload) {
+		if (notification === "FLIGHT_STATUS_INIT") {
+			Log.info(`${this.name}: Client connected.`);
+			// Re-send cached data if we already have it
+			if (this.lastFlightsPayload) {
+				this.sendSocketNotification("FLIGHT_STATUS", this.lastFlightsPayload);
 			}
-		});
+		}
 	},
 
 	getTodayRange() {
@@ -252,9 +252,10 @@ module.exports = NodeHelper.create({
 			return;
 		}
 
-		const url = `https://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.apiKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}&flight_date=${encodeURIComponent(flight.date)}`;
-		const https = require("https");
-		https.get(url, (res) => {
+		// AviationStack free tier only supports HTTP
+		const url = `http://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.apiKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}&flight_date=${encodeURIComponent(flight.date)}`;
+		const http = require("http");
+		http.get(url, (res) => {
 			let body = "";
 			res.on("data", (chunk) => (body += chunk));
 			res.on("end", () => {

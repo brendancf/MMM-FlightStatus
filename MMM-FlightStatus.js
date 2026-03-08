@@ -12,12 +12,16 @@ Module.register("MMM-FlightStatus", {
 		Log.info(`Starting module: ${this.name}`);
 		this.flights = [];
 		this.error = null;
+		// Establish socket connection so we can receive notifications from node_helper
+		this.sendSocketNotification("FLIGHT_STATUS_INIT", this.config);
 	},
 
 	socketNotificationReceived(notification, payload) {
+		Log.info(`${this.name}: Received ${notification} with ${JSON.stringify(payload).substring(0, 200)}`);
 		if (notification === "FLIGHT_STATUS") {
 			this.error = null;
 			this.flights = payload.flights || [];
+			Log.info(`${this.name}: ${this.flights.length} flight(s) to render`);
 			this.updateDom(this.config.animationSpeed);
 		} else if (notification === "FLIGHT_STATUS_ERROR") {
 			this.error = payload.error_type || "unknown";
