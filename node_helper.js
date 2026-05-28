@@ -19,6 +19,7 @@ module.exports = NodeHelper.create({
 		this.calendarService = null;
 		this.flightStatusCache = {};
 		this.apiKey = null;
+		this.aviationStackKey = null;
 		this.fetchTimer = null;
 		this.isActive = true;
 		this.lastFlightsPayload = null; // so we can re-send when a client connects
@@ -53,11 +54,15 @@ module.exports = NodeHelper.create({
 			const keysPath = path.join(this.rootPath, "config", "keys.js");
 			const keys = require(keysPath);
 			this.apiKey = keys.FLIGHTAWARE_KEY || this.config.flightStatusApiKey || "";
-			if (!this.apiKey) {
-				Log.warn(`${this.name}: No FlightAware API key. Add FLIGHTAWARE_KEY to config/keys.js.`);
+			this.aviationStackKey = keys.AVIATIONSTACK_KEY || this.config.aviationStackApiKey || "";
+			if (!this.apiKey && !this.aviationStackKey) {
+				Log.warn(`${this.name}: No flight API key. Add FLIGHTAWARE_KEY or AVIATIONSTACK_KEY to config/keys.js.`);
+			} else if (this.aviationStackKey && !this.apiKey) {
+				Log.info(`${this.name}: Using AviationStack API.`);
 			}
 		} catch (err) {
 			this.apiKey = this.config.flightStatusApiKey || "";
+			this.aviationStackKey = "";
 		}
 
 		this.authenticateGoogle();
@@ -216,7 +221,7 @@ module.exports = NodeHelper.create({
 			return;
 		}
 
-		if (!this.apiKey) {
+		if (!this.apiKey && !this.aviationStackKey) {
 			Log.warn(`${this.name}: No API key — sending flights without status`);
 			this.lastFlightsPayload = {
 				flights: flightsFromCalendar.map((f) => ({
@@ -252,12 +257,21 @@ module.exports = NodeHelper.create({
 			callback(cached.data);
 			return;
 		}
+		const done = (result) => {
+			this.flightStatusCache[cacheKey] = { data: result, ts: Date.now() };
+			callback(result);
+		};
+		if (this.apiKey) {
+			this.fetchFlightStatusFlightAware(flight, done);
+		} else if (this.aviationStackKey) {
+			this.fetchFlightStatusAviationStack(flight, done);
+		}
+	},
 
+	fetchFlightStatusFlightAware(flight, callback) {
 		const https = require("https");
 		const url = `https://aeroapi.flightaware.com/aeroapi/flights/${encodeURIComponent(flight.flightIata)}`;
-		const options = {
-			headers: { "x-apikey": this.apiKey }
-		};
+		const options = { headers: { "x-apikey": this.apiKey } };
 		https.get(url, options, (res) => {
 			let body = "";
 			res.on("data", (chunk) => (body += chunk));
@@ -274,7 +288,6 @@ module.exports = NodeHelper.create({
 						Log.warn(`${this.name}: FlightAware API error for ${flight.flightIata}:`, json.title, json.detail || "");
 					}
 					const flights = json.flights || [];
-					// Match by calendar date (scheduled_out starts with the date in UTC — compare origin local date)
 					const f = flights.find((fl) => {
 						if (!fl.scheduled_out) return false;
 						const depDate = this.utcToLocalDate(fl.scheduled_out, fl.origin && fl.origin.timezone);
@@ -307,34 +320,78 @@ module.exports = NodeHelper.create({
 							timezone: destTz,
 							delay: arrDelay && arrDelay > 0 ? arrDelay : null
 						};
-						Log.info(`${this.name}: ${flight.flightIata} status="${f.status}" ${depIata}->${arrIata} dep=${f.scheduled_out} arr=${f.scheduled_in}`);
+						Log.info(`${this.name}: ${flight.flightIata} (FlightAware) status="${f.status}" ${depIata}->${arrIata}`);
 					} else {
 						Log.info(`${this.name}: ${flight.flightIata} — no matching flight found in FlightAware response`);
 					}
 				} catch (e) {
 					Log.warn(`${this.name}: FlightAware parse error for ${flight.flightIata}:`, e.message);
-					Log.debug(`${this.name}: Response body: ${body.substring(0, 500)}`);
 				}
-				const result = {
-					...flight,
-					status,
-					departure,
-					arrival,
-					airline: "",
-					depIata,
-					arrIata
-				};
-				this.flightStatusCache[cacheKey] = { data: result, ts: Date.now() };
-				callback(result);
+				callback({ ...flight, status, departure, arrival, airline, depIata, arrIata });
 			});
 		}).on("error", (err) => {
 			Log.warn(`${this.name}: FlightAware request error:`, err.message);
-			callback({
-				...flight,
-				status: "unknown",
-				departure: {},
-				arrival: {}
+			callback({ ...flight, status: "unknown", departure: {}, arrival: {} });
+		});
+	},
+
+	fetchFlightStatusAviationStack(flight, callback) {
+		const https = require("https");
+		const url = `https://api.aviationstack.com/v1/flights?access_key=${encodeURIComponent(this.aviationStackKey)}&flight_iata=${encodeURIComponent(flight.flightIata)}`;
+		https.get(url, (res) => {
+			let body = "";
+			res.on("data", (chunk) => (body += chunk));
+			res.on("end", () => {
+				let status = "unknown";
+				let departure = {};
+				let arrival = {};
+				let airline = "";
+				let depIata = "";
+				let arrIata = "";
+				try {
+					const json = JSON.parse(body);
+					if (json.error) {
+						Log.warn(`${this.name}: AviationStack API error for ${flight.flightIata}:`, json.error.message || "");
+					}
+					const flights = json.data || [];
+					const f = flights.find((fl) => fl.flight_date === flight.date) || flights[0];
+					if (f) {
+						status = (f.flight_status || "unknown").toLowerCase();
+						const dep = f.departure || {};
+						const arr = f.arrival || {};
+						depIata = dep.iata || "";
+						arrIata = arr.iata || "";
+						airline = (f.airline && (f.airline.name || f.airline.iata)) || "";
+						departure = {
+							scheduled: dep.scheduled,
+							estimated: dep.estimated,
+							actual: dep.actual,
+							gate: dep.gate || "",
+							terminal: dep.terminal || "",
+							timezone: dep.timezone || "",
+							delay: dep.delay && dep.delay > 0 ? dep.delay : null
+						};
+						arrival = {
+							scheduled: arr.scheduled,
+							estimated: arr.estimated,
+							actual: arr.actual,
+							gate: arr.gate || "",
+							terminal: arr.terminal || "",
+							timezone: arr.timezone || "",
+							delay: arr.delay && arr.delay > 0 ? arr.delay : null
+						};
+						Log.info(`${this.name}: ${flight.flightIata} (AviationStack) status="${f.flight_status}" ${depIata}->${arrIata}`);
+					} else {
+						Log.info(`${this.name}: ${flight.flightIata} — no matching flight found in AviationStack response`);
+					}
+				} catch (e) {
+					Log.warn(`${this.name}: AviationStack parse error for ${flight.flightIata}:`, e.message);
+				}
+				callback({ ...flight, status, departure, arrival, airline, depIata, arrIata });
 			});
+		}).on("error", (err) => {
+			Log.warn(`${this.name}: AviationStack request error:`, err.message);
+			callback({ ...flight, status: "unknown", departure: {}, arrival: {} });
 		});
 	},
 
